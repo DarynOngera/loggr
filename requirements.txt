@@ -1,0 +1,9 @@
+flask
+pynput
+psutil
+requests
+pyperclip
+pandas
+mss
+watchdog
+

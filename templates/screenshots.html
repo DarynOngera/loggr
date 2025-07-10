@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Screenshots</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 0; margin: 0; background: #1a1a2e; color: #e0e0e0; }
+        .navbar { background-color: #16213e; padding: 15px 20px; border-bottom: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; }
+        .navbar a { color: #e0e0e0; text-decoration: none; margin-right: 25px; font-size: 1.1em; transition: color 0.3s ease; }
+        .navbar a:hover { color: #e94560; }
+        .container { padding: 30px; }
+        h1 { color: #e94560; margin-bottom: 25px; text-align: center; }
+        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        .gallery img { width: 100%; border: 2px solid #444; cursor: pointer; }
+        .modal { display: none; position: fixed; z-index: 1; padding-top: 50px; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9); }
+        .modal-content { margin: auto; display: block; max-width: 90%; max-height: 90%; }
+        .close { position: absolute; top: 15px; right: 35px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div>
+            <a href="/">Keystroke Log</a>
+            <a href="/network">Network Log</a>
+            <a href="/screenshots">Screenshots</a>
+            <a href="/browser">Browser History</a>
+            <a href="/filesystem">File System Activity</a>
+        </div>
+    </div>
+    <div class="container">
+        <h1>Screenshots</h1>
+        <div class="gallery">
+            {% for image in images %}
+                <img src="/screenshots/{{ image }}" alt="{{ image }}" onclick="openModal(this.src)">
+            {% endfor %}
+        </div>
+
+        <div id="myModal" class="modal">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <img class="modal-content" id="modalImg">
+        </div>
+    </div>
+
+    <script>
+        var modal = document.getElementById('myModal');
+        var modalImg = document.getElementById("modalImg");
+        function openModal(src) {
+            modal.style.display = "block";
+            modalImg.src = src;
+        }
+        function closeModal() {
+            modal.style.display = "none";
+        }
+    </script>
+</body>
+</html>

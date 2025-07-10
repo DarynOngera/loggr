@@ -9,6 +9,7 @@ NETWORK_LOG_FILE = os.path.join(LOG_DIR, "network_activity.csv")
 BROWSER_LOG_FILE = os.path.join(LOG_DIR, "browser_history.csv")
 FILESYSTEM_LOG_FILE = os.path.join(LOG_DIR, "filesystem_activity.csv")
 SCREENSHOT_DIR = os.path.join(LOG_DIR, "screenshots")
+os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
 def load_key_data():
     try:

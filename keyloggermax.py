@@ -17,7 +17,7 @@ from mss import mss
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-LOG_DIR = os.path.expanduser("~/projects/keylogger_max")
+LOG_DIR = os.path.expanduser("~/projects/keylogger_max/output")
 KEY_LOG_FILE = os.path.join(LOG_DIR, "activity.csv")
 NETWORK_LOG_FILE = os.path.join(LOG_DIR, "network_activity.csv")
 BROWSER_LOG_FILE = os.path.join(LOG_DIR, "browser_history.csv")

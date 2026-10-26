@@ -23,35 +23,59 @@ Keylogger Max is a comprehensive system designed for monitoring and logging vari
     git clone <repository_url>
     cd keylogger_max
     ```
-2.  **Create a virtual environment (recommended):**
+2.  **Install dependencies and set up the virtual environment using Makefile:**
     ```bash
-    python3 -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    make install
     ```
-3.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-    *Note: This project uses `ruff` for linting. If you wish to run lint checks, you may need to install it separately: `pip install ruff`.*
 
 ## Usage
 
 ### 1. Start the Keylogger
-To begin monitoring and logging activities, run the `keyloggermax.py` script:
+To begin monitoring and logging activities, use the Makefile:
 ```bash
-python3 keyloggermax.py
+make run_keylogger
 ```
 This script will run in the background, collecting data and saving it to the `output/` directory.
 
 ### 2. Start the Web Interface
-To view the collected data, start the Flask web application:
+To view the collected data, use the Makefile to start the Flask web application:
 ```bash
-python3 app.py
+make run_app
 ```
 Once the server is running, open your web browser and navigate to `http://127.0.0.1:5000/` (or the address displayed in your terminal).
 
 ### Data Storage
 All collected data (keystrokes, network activity, browser history, filesystem events, and screenshots) is stored in the `output/` directory within the project.
+
+## Windows Specific Implementation
+
+For Windows operating systems, a separate implementation is provided that stores all collected data in a SQLite database for improved data handling and querying.
+
+### Setup (Windows)
+1.  **Navigate to the Windows directory:**
+    ```bash
+    cd windows_keylogger
+    ```
+2.  **Install dependencies and set up the virtual environment using Makefile:**
+    ```bash
+    make install
+    ```
+
+### Usage (Windows)
+1.  **Start the Keylogger (Windows):**
+    ```bash
+    make run_keylogger
+    ```
+    This script will run in the background, collecting data and saving it to `output/keylogger_data.db`.
+
+2.  **Start the Web Interface (Windows):**
+    ```bash
+    make run_app
+    ```
+    Once the server is running, open your web browser and navigate to `http://127.0.0.1:5000/` (or the address displayed in your terminal).
+
+### Data Storage (Windows)
+All collected data for the Windows implementation is stored in `output/keylogger_data.db`.
 
 ## Project Structure
 ```
@@ -71,6 +95,18 @@ keylogger_max/
 │   ├── browser.html
 │   ├── filesystem.html
 │   └── screenshots.html
+├── Makefile                # Project build and management commands
+├── windows_keylogger/      # Windows-specific implementation
+│   ├── app.py
+│   ├── keyloggermax.py
+│   ├── requirements.txt
+│   ├── Makefile
+│   └── templates/
+│       ├── index.html
+│       ├── network.html
+│       ├── browser.html
+│       ├── filesystem.html
+│       └── screenshots.html
 └── README.md               # This file
 ```
 
